@@ -2,13 +2,11 @@ import os
 import sys
 import requests
 import logging
-import datetime
 import time
 
 from dotenv import load_dotenv
 
 from requests import exceptions
-from telegram.ext import Updater, MessageHandler, Filters, CommandHandler
 from http import HTTPStatus
 import telegram
 
@@ -67,7 +65,7 @@ def get_api_answer(timestamp):
         return response.json()
     except Exception as Error:
         logging.error(f"Ошибка выполнения запроса: ({Error})")
-        raise exceptions.RequestException(f"Ошибка выполнения запроса: ({Error})")
+        raise exceptions.RequestException(f"Ошибка запроса: {Error}")
 
 
 def check_response(response):
