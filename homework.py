@@ -1,11 +1,15 @@
 import os
+import sys
 import requests
 import logging
+import datetime
 import time
 
 from dotenv import load_dotenv
 
+from requests import exceptions
 from telegram.ext import Updater, MessageHandler, Filters, CommandHandler
+from http import HTTPStatus
 import telegram
 
 load_dotenv()
@@ -20,7 +24,7 @@ DOTENV = {
     'TELEGRAM_CHAT_ID': TELEGRAM_CHAT_ID,
 }
 
-RETRY_PERIOD =  10 #600
+RETRY_PERIOD = 600
 ENDPOINT = 'https://practicum.yandex.ru/api/user_api/homework_statuses/'
 HEADERS = {'Authorization': f'OAuth {PRACTICUM_TOKEN}'}
 
@@ -37,61 +41,76 @@ HOMEWORK_VERDICTS = {
 
 
 def check_tokens():
-    for name, token in DOTENV.items():
-        if token is None:
-            logging.critical(
-                "Отсутствует обязательная переменная окружения: "
-                f"{name}\nПрограмма принудительно остановлена.")
-            return False
-    return True
-
+    """Проверка наличия необходимых токенов в .env."""
+    return all([PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID])
 
 
 def send_message(bot, message):
-    bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
+    """Отправка сообщения в чат."""
+    try:
+        bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
+        logging.debug(f"Отправлено сообщение: {message}")
+    except Exception as Error:
+        logging.error(f"Ошибка отправки сообщения: ({Error})")
 
 
 def get_api_answer(timestamp):
+    """Отпрака запроса на API домашки. Возвращает ответ от API."""
     params = {'from_date': timestamp}
     try:
-        response = requests.get(ENDPOINT, headers=HEADERS, params=params).json()
-        return response
+        response = requests.get(ENDPOINT, headers=HEADERS, params=params)
+        if response.status_code != HTTPStatus.OK:
+            logging.error(f"Ошибка выполнения запроса: {response.status_code}")
+            raise exceptions.RequestException(
+                f"Ошибка запроса. Код ответа: {response.status_code}"
+            )
+        return response.json()
     except Exception as Error:
         logging.error(f"Ошибка выполнения запроса: ({Error})")
-        return None
+        raise exceptions.RequestException(f"Ошибка выполнения запроса: ({Error})")
 
 
 def check_response(response):
-    if (response is not None):
-        # Тут еще другие проверки будут
-        return True
-    else:
-        return False
+    """Проверка корректности полученного от API домашки ответа."""
+    if not isinstance(response, dict):
+        raise TypeError("Переменная не соответствует типу 'dict'")
+    homeworks = response.get('homeworks')
+    if not isinstance(homeworks, list):
+        raise TypeError("Тип преченя домашних работ не является списком")
+    return True
 
 
 def parse_status(homework):
+    """Достает из словаря homework данные о статусе проверки дз."""
     homework_name = homework.get('homework_name')
+    if (homework_name is None):
+        raise KeyError("В ответе API нет названия домашки")
     status = homework.get('status')
+    if (status is None):
+        raise KeyError("В ответе API нет статуса домашки")
     verdict = HOMEWORK_VERDICTS.get(status)
     if verdict is None:
-        logging.error(f'Неизвестный статус работы: {status}')
+        raise KeyError(f"Неизвестный статус работы: {status}")
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
 
 def main():
     """Основная логика работы бота."""
     if not check_tokens():
-        return
-    
+        logging.critical(
+            "Отсутствует обязательная переменная окружения"
+            "Программа принудительно остановлена.")
+        sys.exit()
+
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
-    timestamp = int(time.time())
+    timestamp = 0
     while True:
         try:
             response = get_api_answer(timestamp)
             timestamp = int(time.time())
             if check_response(response):
                 homeworks = list(response.get('homeworks'))
-                if not homeworks:
+                if len(homeworks) == 0:
                     logging.debug('Обновлений не найдено')
                 else:
                     for homework in homeworks:
