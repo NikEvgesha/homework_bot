@@ -57,15 +57,15 @@ def get_api_answer(timestamp):
     params = {'from_date': timestamp}
     try:
         response = requests.get(ENDPOINT, headers=HEADERS, params=params)
-        if response.status_code != HTTPStatus.OK:
-            logging.error(f"Ошибка выполнения запроса: {response.status_code}")
-            raise exceptions.RequestException(
-                f"Ошибка запроса. Код ответа: {response.status_code}"
-            )
-        return response.json()
     except Exception as Error:
         logging.error(f"Ошибка выполнения запроса: ({Error})")
-        raise exceptions.RequestException(f"Ошибка запроса: {Error}")
+        return None
+    if response.status_code != HTTPStatus.OK:
+        logging.error(f"Ошибка. Код ответа: {response.status_code}")
+        raise exceptions.ConnectionError(
+            f"Ошибка. Код ответа: {response.status_code}"
+        )
+    return response.json()
 
 
 def check_response(response):
