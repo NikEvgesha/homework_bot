@@ -3,7 +3,7 @@ import sys
 import requests
 import logging
 import time
-import telegram
+from telebot import TeleBot
 
 from dotenv import load_dotenv
 from requests import exceptions
@@ -99,7 +99,8 @@ def main():
             'Отсутствует обязательная переменная окружения'
             'Программа принудительно остановлена.')
         sys.exit()
-    bot = telegram.Bot(token=TELEGRAM_TOKEN)
+    bot = TeleBot(token=TELEGRAM_TOKEN)
+
     timestamp = 0
     while True:
         try:
