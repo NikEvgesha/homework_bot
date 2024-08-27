@@ -58,7 +58,7 @@ def get_api_answer(timestamp):
         response = requests.get(ENDPOINT, headers=HEADERS, params=params)
     except Exception as Error:
         logging.error(f'Ошибка выполнения запроса: ({Error})')
-        return None
+        return
     if response.status_code != HTTPStatus.OK:
         logging.error(f'Ошибка. Код ответа: {response.status_code}')
         raise exceptions.ConnectionError(
@@ -80,10 +80,10 @@ def check_response(response):
 def parse_status(homework):
     """Достает из словаря homework данные о статусе проверки дз."""
     homework_name = homework.get('homework_name')
-    if (homework_name is None):
+    if homework_name is None:
         raise KeyError('В ответе API нет названия домашки')
     status = homework.get('status')
-    if (status is None):
+    if status is None:
         raise KeyError('В ответе API нет статуса домашки')
     verdict = HOMEWORK_VERDICTS.get(status)
     if verdict is None:
@@ -115,11 +115,12 @@ def main():
                         message = parse_status(homework)
                         send_message(bot, message)
         except Exception as error:
-            if (error != last_exception):
+            if error != last_exception:
                 message = f'Сбой в работе программы: {error}'
                 send_message(bot, message)
                 last_exception = error
-        time.sleep(RETRY_PERIOD)
+        finally:
+            time.sleep(RETRY_PERIOD)
 
 
 if __name__ == '__main__':
